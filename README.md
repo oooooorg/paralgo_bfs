@@ -1,20 +1,20 @@
 # paralgo_bfs
 Реализация параллельной версии алгоритма BFS и сравнение с последовательной версией
 
-Sequential BFS
-Run 1: 1.699637583s
-Run 2: 1.849671791s
-Run 3: 2.350748959s
-Run 4: 1.886960917s
-Run 5: 1.444208125s
-Parallel BFS
-Run 1: 605.359875ms
-Run 2: 545.322041ms
-Run 3: 546.243167ms
-Run 4: 526.387958ms
-Run 5: 529.574834ms
+Sequential BFS\
+Run 1: 1.699637583s\
+Run 2: 1.849671791s\
+Run 3: 2.350748959s\
+Run 4: 1.886960917s\
+Run 5: 1.444208125s\
+Parallel BFS\
+Run 1: 605.359875ms\
+Run 2: 545.322041ms\
+Run 3: 546.243167ms\
+Run 4: 526.387958ms\
+Run 5: 529.574834ms\
 
-Speedup is 3.35x
+Speedup is 3.35x\
 
 Запуск тестов через команду
 `go test`
