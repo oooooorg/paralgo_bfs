@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"reflect"
 	"runtime"
 	"sync"
 	"testing"
@@ -26,16 +27,16 @@ func TestCorrectness(t *testing.T) {
 	
 	t.Run("seq_bfs", func(t *testing.T) {
 		dist := SeqBFS(testGraph, startNode)
-		if err := checkCorrect(dist, N); err != nil {
+		if err := checkCorrectCubeGraph(dist, N); err != nil {
 			t.Errorf("Sequential BFS no correct: %v", err)
 		}
 	})
 	
-	t.Run("par_bfs (4 procs)", func(t *testing.T) {
+	t.Run("par_bfs", func(t *testing.T) {
 		runtime.GOMAXPROCS(4)
 		
 		dist := ParBFS(testGraph, startNode)
-		if err := checkCorrect(dist, N); err != nil {
+		if err := checkCorrectCubeGraph(dist, N); err != nil {
 			t.Errorf("Parallel BFS no correct: %v", err)
 		}
 	})
@@ -80,7 +81,7 @@ func TestPerformanceComparison(t *testing.T) {
 	fmt.Printf("\nSpeedup is %.2fx\n", speedup)
 }
 
-func BenchmarkBFS_Seq(b *testing.B) {
+func Benchmark_SeqBFS(b *testing.B) {
 	runtime.GOMAXPROCS(1)
 	startNode := Node(0)
 	b.ResetTimer()
@@ -90,13 +91,73 @@ func BenchmarkBFS_Seq(b *testing.B) {
 	}
 }
 
-func BenchmarkBFS_Par_4Procs(b *testing.B) {
+func Benchmark_ParBFS_4Procs(b *testing.B) {
 	runtime.GOMAXPROCS(4)
 	startNode := Node(0)
 	b.ResetTimer()
 	
 	for i := 0; i < b.N; i++ {
 		ParBFS(testGraph, startNode)
+	}
+}
+
+func TestBFS_Correctness(t *testing.T) {
+	tests := []struct {
+		name     string
+		graph    Graph
+		start    Node
+		expected []int32
+	}{
+		{
+			name: "Single Start Node",
+			graph: Graph{
+				Adj: [][]Node{
+					{},
+				},
+			},
+			start:    Node(0),
+			expected: []int32{0},
+		},
+		{
+			name: "Path Graph",
+			graph: Graph{
+				Adj: [][]Node{
+					{1},
+					{2},
+					{},
+				},
+			},
+			start:    Node(0),
+			expected: []int32{0, 1, 2},
+		},
+		{
+			name: "Cycle Graph",
+			graph: Graph{
+				Adj: [][]Node{
+					{1},
+					{0},
+				},
+			},
+			start:    0,
+			expected: []int32{0, 1},
+		},
+	}
+	
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gotSeq := SeqBFS(tc.graph, tc.start)
+			checkDist(t, "SeqBFS", gotSeq, tc.expected)
+			
+			gotPar := ParBFS(tc.graph, tc.start)
+			checkDist(t, "ParBFS", gotPar, tc.expected)
+		})
+	}
+}
+
+func checkDist(t *testing.T, name string, got, want []int32) {
+	t.Helper()
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("%s: got %v, want %v", name, got, want)
 	}
 }
 
@@ -152,7 +213,7 @@ func genGraph(n int) Graph {
 	return Graph{Adj: adj}
 }
 
-func checkCorrect(dist []int32, n int) error {
+func checkCorrectCubeGraph(dist []int32, n int) error {
 	for x := 0; x < n; x++ {
 		for y := 0; y < n; y++ {
 			for z := 0; z < n; z++ {
