@@ -16,7 +16,7 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	testGraph = genGraph(N)
+	testGraph = buildCubeGraph(N)
 	code := m.Run()
 	
 	os.Exit(code)
@@ -101,55 +101,181 @@ func Benchmark_ParBFS_4Procs(b *testing.B) {
 	}
 }
 
-func TestBFS_Correctness(t *testing.T) {
+func TestSeqBFS_Correctness(t *testing.T) {
+	const nNodes = 10000000
+	
+	makeDist := func(n int) []int32 {
+		res := make([]int32, n)
+		for i := range res {
+			res[i] = int32(i)
+		}
+		return res
+	}
+	
+	makeStarDist := func(n int) []int32 {
+		res := make([]int32, n)
+		res[0] = 0
+		for i := 1; i < n; i++ {
+			res[i] = 1
+		}
+		return res
+	}
+	
+	makeRingDist := func(n int) []int32 {
+		res := make([]int32, n)
+		for i := 0; i < n; i++ {
+			dist := i
+			if n-i < dist {
+				dist = n - i
+			}
+			res[i] = int32(dist)
+		}
+		return res
+	}
+	
 	tests := []struct {
-		name     string
-		graph    Graph
-		start    Node
-		expected []int32
+		name           string
+		buildGraphFunc func() (Graph, []int32)
 	}{
 		{
-			name: "Single Start Node",
-			graph: Graph{
-				Adj: [][]Node{
-					{},
-				},
+			name: "Path Graph",
+			buildGraphFunc: func() (Graph, []int32) {
+				adj := make([][]Node, nNodes)
+				for i := 0; i < nNodes-1; i++ {
+					adj[i] = []Node{Node(i + 1)}
+				}
+				adj[nNodes-1] = []Node{}
+				
+				return Graph{Adj: adj}, makeDist(nNodes)
 			},
-			start:    Node(0),
-			expected: []int32{0},
 		},
 		{
-			name: "Path Graph",
-			graph: Graph{
-				Adj: [][]Node{
-					{1},
-					{2},
-					{},
-				},
+			name: "Star Graph",
+			buildGraphFunc: func() (Graph, []int32) {
+				adj := make([][]Node, nNodes)
+				neighbors := make([]Node, 0, nNodes-1)
+				
+				for i := 1; i < nNodes; i++ {
+					neighbors = append(neighbors, Node(i))
+					adj[i] = []Node{}
+				}
+				adj[0] = neighbors
+				
+				return Graph{Adj: adj}, makeStarDist(nNodes)
 			},
-			start:    Node(0),
-			expected: []int32{0, 1, 2},
 		},
 		{
 			name: "Cycle Graph",
-			graph: Graph{
-				Adj: [][]Node{
-					{1},
-					{0},
-				},
+			buildGraphFunc: func() (Graph, []int32) {
+				adj := make([][]Node, nNodes)
+				for i := 0; i < nNodes; i++ {
+					prev := (i - 1 + nNodes) % nNodes
+					next := (i + 1) % nNodes
+					adj[i] = []Node{Node(prev), Node(next)}
+				}
+				return Graph{Adj: adj}, makeRingDist(nNodes)
 			},
-			start:    0,
-			expected: []int32{0, 1},
 		},
 	}
 	
+	runtime.GOMAXPROCS(1)
 	for _, tc := range tests {
+		runtime.GC()
 		t.Run(tc.name, func(t *testing.T) {
-			gotSeq := SeqBFS(tc.graph, tc.start)
-			checkDist(t, "SeqBFS", gotSeq, tc.expected)
+			graph, expected := tc.buildGraphFunc()
+			start := Node(0)
 			
-			gotPar := ParBFS(tc.graph, tc.start)
-			checkDist(t, "ParBFS", gotPar, tc.expected)
+			gotPar := SeqBFS(graph, start)
+			checkDist(t, "ParBFS", gotPar, expected)
+		})
+	}
+}
+
+func TestParBFS_Correctness(t *testing.T) {
+	const nNodes = 10000000
+	
+	makeDist := func(n int) []int32 {
+		res := make([]int32, n)
+		for i := range res {
+			res[i] = int32(i)
+		}
+		return res
+	}
+	
+	makeStarDist := func(n int) []int32 {
+		res := make([]int32, n)
+		res[0] = 0
+		for i := 1; i < n; i++ {
+			res[i] = 1
+		}
+		return res
+	}
+	
+	makeRingDist := func(n int) []int32 {
+		res := make([]int32, n)
+		for i := 0; i < n; i++ {
+			dist := i
+			if n-i < dist {
+				dist = n - i
+			}
+			res[i] = int32(dist)
+		}
+		return res
+	}
+	
+	tests := []struct {
+		name           string
+		buildGraphFunc func() (Graph, []int32)
+	}{
+		{
+			name: "Path Graph",
+			buildGraphFunc: func() (Graph, []int32) {
+				adj := make([][]Node, nNodes)
+				for i := 0; i < nNodes-1; i++ {
+					adj[i] = []Node{Node(i + 1)}
+				}
+				adj[nNodes-1] = []Node{}
+				
+				return Graph{Adj: adj}, makeDist(nNodes)
+			},
+		},
+		{
+			name: "Star Graph",
+			buildGraphFunc: func() (Graph, []int32) {
+				adj := make([][]Node, nNodes)
+				neighbors := make([]Node, 0, nNodes-1)
+				
+				for i := 1; i < nNodes; i++ {
+					neighbors = append(neighbors, Node(i))
+					adj[i] = []Node{}
+				}
+				adj[0] = neighbors
+				
+				return Graph{Adj: adj}, makeStarDist(nNodes)
+			},
+		},
+		{
+			name: "Cycle Graph",
+			buildGraphFunc: func() (Graph, []int32) {
+				adj := make([][]Node, nNodes)
+				for i := 0; i < nNodes; i++ {
+					prev := (i - 1 + nNodes) % nNodes
+					next := (i + 1) % nNodes
+					adj[i] = []Node{Node(prev), Node(next)}
+				}
+				return Graph{Adj: adj}, makeRingDist(nNodes)
+			},
+		},
+	}
+	
+	runtime.GOMAXPROCS(4)
+	for _, tc := range tests {
+		runtime.GC()
+		t.Run(tc.name, func(t *testing.T) {
+			graph, expected := tc.buildGraphFunc()
+			start := Node(0)
+			gotPar := ParBFS(graph, start)
+			checkDist(t, "ParBFS", gotPar, expected)
 		})
 	}
 }
@@ -161,7 +287,7 @@ func checkDist(t *testing.T, name string, got, want []int32) {
 	}
 }
 
-func genGraph(n int) Graph {
+func buildCubeGraph(n int) Graph {
 	totalNodes := n * n * n
 	adj := make([][]Node, totalNodes)
 	
